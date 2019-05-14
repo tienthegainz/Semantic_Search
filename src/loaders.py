@@ -10,16 +10,19 @@ from tqdm import tqdm
 class TextSequenceGenerator(keras.utils.Sequence):
     """Generates data for Keras"""
 
-    def __init__(self, mode="train", batch_size=16,
+    def __init__(self, fpath, mode="train", batch_size=16,
                  img_size=(224, 224), no_channels=3, shuffle=True):
         # train 95, test 5
         self.imgs, self.labels = [], []
         if mode == "train":
-            base_train = 'path-to-train-folder/train'
+            base_train = fpath
+            id_labels = sorted(os.listdir(base_train))
             for folder in tqdm(id_labels):
-                label_path = os.path.join(base_train, folder, 'images')
+                label_path = os.path.join(base_train, folder)
                 fn_paths = sorted(os.listdir(label_path))
                 for fn_path in fn_paths:
+                    # imgs : path to images
+                    # labels: coressponding label for that image
                     self.imgs.append(os.path.join(label_path, fn_path))
                     self.labels.append(folder)
         elif mode == "val":
