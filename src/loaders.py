@@ -80,5 +80,6 @@ class TextSequenceGenerator(keras.utils.Sequence):
             img = np.expand_dims(img, axis=0)
             img = preprocess_input(img)
             X[i, ] = img
-            Y[i] = wv_label_mapping[self.labels[id_]]
+            # Y[i] = wv_label_mapping[self.labels[id_]]
+            Y[i] = self.labels[id_]
         return X, Y
