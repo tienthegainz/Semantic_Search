@@ -7,11 +7,18 @@ from src.loaders import TextSequenceGenerator
 if __name__ == '__main__':
     num_epochs = 10
     batch_size = 16
+    ratio = 0.2
     custom_model = setup_custom_model()
-    data_generator = TextSequenceGenerator(fpath='Vietnam_Food/Training/',
-        mode="train", batch_size=batch_size, shuffle=True)
-    #val_data_generator = TextSequenceGenerator(
-    #    mode="val", batch_size=batch_size, shuffle=False)
+    train_generator = TextSequenceGenerator(fpath='Vietnam_Food/Training/',
+                                            mode="train",
+                                            batch_size=batch_size,
+                                            split_ratio = ratio,
+                                            shuffle=True)
+    val_generator = TextSequenceGenerator(fpath='Vietnam_Food/Training/',
+                                            mode="val",
+                                            batch_size=batch_size,
+                                            split_ratio = ratio,
+                                            shuffle=True)
 
     checkpointer = ModelCheckpoint(
         filepath='../models/checkpoint.{epoch:02d}-{loss:.2f}.hdf5',
