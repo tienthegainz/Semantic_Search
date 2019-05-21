@@ -21,7 +21,7 @@ class TextSequenceGenerator(keras.utils.Sequence):
         """
         # train 95, test 5
         self.imgs, self.labels, self.unique_labels = [], [], []
-        if split_ratio > 1 || split_ratio < 0:
+        if split_ratio > 1 or split_ratio < 0:
             print("Invalid split_ration parameter\n")
             exit()
         if mode == "train":
@@ -32,7 +32,7 @@ class TextSequenceGenerator(keras.utils.Sequence):
                 fn_paths = sorted(os.listdir(label_path))
                 fn_len = len(fn_paths)
                 # split
-                fn_paths = fn_paths[ :((1-split_ratio)*fn_len)]
+                fn_paths = fn_paths[ :int((1-split_ratio)*fn_len)]
                 for fn_path in fn_paths:
                     # imgs : path to images
                     # labels: coressponding label for that image
@@ -49,7 +49,7 @@ class TextSequenceGenerator(keras.utils.Sequence):
                 fn_paths = sorted(os.listdir(label_path))
                 fn_len = len(fn_paths)
                 # split
-                fn_paths = fn_paths[((1-split_ratio)*fn_len): ]
+                fn_paths = fn_paths[int((1-split_ratio)*fn_len): ]
                 for fn_path in fn_paths:
                     # imgs : path to images
                     # labels: coressponding label for that image
@@ -60,6 +60,7 @@ class TextSequenceGenerator(keras.utils.Sequence):
                         self.unique_labels.append(folder)
         #ids: data amount
         self.ids = range(len(self.imgs))
+        self.indexes = np.arange(len(self.ids))
         # img_size, img_w, img_h: image size for later use
         self.img_size = img_size
         self.img_w, self.img_h = self.img_size
@@ -68,6 +69,8 @@ class TextSequenceGenerator(keras.utils.Sequence):
         self.no_channels = no_channels
 
         self.n_classes = n_classes
+
+        self.unique_labels = sorted(self.unique_labels)
 
         self.shuffle = shuffle
         if mode == "train":
@@ -84,13 +87,13 @@ class TextSequenceGenerator(keras.utils.Sequence):
 
         ids = [self.ids[k] for k in indexes]
 
-        X = self.__data_generation(ids)
+        X, Y = self.__data_generation(ids)
 
-        return X
+        return X, Y
 
     def on_epoch_end(self):
         """Updates indexes after each epoch"""
-        self.indexes = np.arange(len(self.ids))
+        #self.indexes = np.arange(len(self.ids))
         if self.shuffle:
             np.random.shuffle(self.indexes)
 
@@ -109,9 +112,8 @@ class TextSequenceGenerator(keras.utils.Sequence):
             img = np.expand_dims(img, axis=0)
             img = preprocess_input(img)
             X[i] = img
-            # Y[i] = wv_label_mapping(self.labels[id_])
-            #Y[i] = self.labels[id_]
-        return X
+            Y[i] = self.wv_label_mapping(self.labels[id_])
+        return X, Y
 
     def wv_label_mapping(self, y_label):
         """Making one hot code from labels"""

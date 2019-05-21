@@ -10,37 +10,20 @@ import matplotlib.pyplot as plt
 from keras.applications.vgg16 import preprocess_input
 from keras.preprocessing import image
 from tqdm import tqdm
+from feature_extractor import FeatureExtractor
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def load_glove_vectors(glove_dir, glove_name='glove.6B.100d.txt'):
-    embeddings_index = {}
-    with open(os.path.join(glove_dir, glove_name)) as f:
-        for line in f:
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
-    print('Found %s word vectors.' % len(embeddings_index))
-    return embeddings_index
-
-
-def load_paired_img_wrd(labels_map_cleanup):
-    wv_label_mapping = {}
-    for key, value in labels_map_cleanup.items():
-        vectors = np.array([word_vectors[label] if label in word_vectors
-                            else np.zeros(shape=100) for label in value])
-        class_vector = np.mean(vectors, axis=0)
-        wv_label_mapping[key] = class_vector
-    return wv_label_mapping
-
-
-def generate_features(id_labels, model):
-    base_train = 'path-to-train-folder/train'
+def generate_features(id_labels, fe):
+    """
+    Yield out the vector feature and path to that images
+    """
+    TRAIN_BASE = '../Vietnam_Food/Training/'
+    id_labels = os.listdir(TRAIN_BASE)
     for folder in tqdm(id_labels):
-        label_path = os.path.join(base_train, folder, 'images')
+        label_path = os.path.join(TRAIN_BASE, folder)
         fn_paths = sorted(os.listdir(label_path))
         fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
         for fn_path in fn_paths:
@@ -48,29 +31,27 @@ def generate_features(id_labels, model):
             img = image.img_to_array(img)
             img = np.expand_dims(img, axis=0)
             input_ = preprocess_input(img)
-            feature = model.predict(input_)
+            feature = fe.extract(input_)
 
             yield feature, fn_path
 
 
 def build_image_mapping(id_labels):
-    base_train = 'path-to-train-folder/train'
+    """
+    
+    """
+    TRAIN_BASE = '../Vietnam_Food/Training/'
     i = 0
+    #id_labels = os.listdir(TRAIN_BASE)
     images_mapping = {}
     for folder in tqdm(id_labels):
-        label_path = os.path.join(base_train, folder, 'images')
+        label_path = os.path.join(TRAIN_BASE, folder)
         fn_paths = sorted(os.listdir(label_path))
         fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
         for fn_path in fn_paths:
             images_mapping[i] = fn_path
             i += 1
     return images_mapping
-
-
-def build_word_mapping(word_vectors):
-    word_list = [(i, word) for i, word in enumerate(word_vectors)]
-    word_mapping = {k: v for k, v in word_list}
-    return word_mapping
 
 
 def index_features(features, mode="image", n_trees=1000, dims=4096):
@@ -83,17 +64,6 @@ def index_features(features, mode="image", n_trees=1000, dims=4096):
             feature_index.add_item(i, vec)
     feature_index.build(n_trees)
     return feature_index
-
-
-def extract_feat(self, img_path):
-    img = image.load_img(img_path, target_size=(
-        self.input_shape[0], self.input_shape[1]))
-    img = image.img_to_array(img)
-    img = np.expand_dims(img, axis=0)
-    img = preprocess_input(img)
-    feat = self.model.predict(img)
-    norm_feat = feat[0] / linalg.norm(feat[0])
-    return norm_feat
 
 
 def search_index_by_key(key, feature_index, item_mapping, top_n=10):
@@ -134,10 +104,3 @@ def show_imgs(id_folder):
         fig.add_subplot(rows, columns, i)
         plt.imshow(img)
     plt.show()
-
-
-def remove_punctuation(text):
-    """https://stackoverflow.com/a/37221663"""
-    import string  # noqa
-    table = str.maketrans({key: None for key in string.punctuation})
-    return text.translate(table)
