@@ -1,4 +1,3 @@
-import random
 import os
 import logging
 
@@ -8,99 +7,92 @@ from numpy import linalg
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from keras.applications.vgg16 import preprocess_input
+from keras.models import Model
+from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
 from tqdm import tqdm
-from feature_extractor import FeatureExtractor
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-
-def generate_features(id_labels, fe):
-    """
-    Yield out the vector feature and path to that images
-    """
-    TRAIN_BASE = '../Vietnam_Food/Training/'
-    id_labels = os.listdir(TRAIN_BASE)
-    for folder in tqdm(id_labels):
-        label_path = os.path.join(TRAIN_BASE, folder)
-        fn_paths = sorted(os.listdir(label_path))
-        fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
-        for fn_path in fn_paths:
-            img = image.load_img(fn_path, target_size=(224, 224))
-            img = image.img_to_array(img)
-            img = np.expand_dims(img, axis=0)
-            input_ = preprocess_input(img)
-            feature = fe.extract(input_)
-
-            yield feature, fn_path
+class VetorSearch:
+    def __init__(self, model, data_path='../Vietnam_Food/Training/',
+                image_size = (224, 224), dims=4096):
+        self.model = model
+        self.data_path = data_path
+        self.image_size = image_size
+        self.dims = dims
+        self.id_labels = sorted(os.listdir(self.data_path))
 
 
-def build_image_mapping(id_labels):
-    """
-    
-    """
-    TRAIN_BASE = '../Vietnam_Food/Training/'
-    i = 0
-    #id_labels = os.listdir(TRAIN_BASE)
-    images_mapping = {}
-    for folder in tqdm(id_labels):
-        label_path = os.path.join(TRAIN_BASE, folder)
-        fn_paths = sorted(os.listdir(label_path))
-        fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
-        for fn_path in fn_paths:
-            images_mapping[i] = fn_path
-            i += 1
-    return images_mapping
+    def preprocess_img(self, fn_path):
+        img = image.load_img(fn_path, target_size=self.image_size)
+        img = img.convert('RGB')
+        img = image.img_to_array(img)
+        img = np.expand_dims(img, axis=0)
+        input_ = preprocess_input(img)
+        feature = self.model.predict(img)[0]
+        feature = feature / np.linalg.norm(feature)
+        return feature
 
 
-def index_features(features, mode="image", n_trees=1000, dims=4096):
-    feature_index = AnnoyIndex(dims, metric='angular')
-    for i, row in enumerate(features):
-        vec = row
-        if mode == "image":
-            feature_index.add_item(i, vec[0][0])
-        elif mode == "word":
-            feature_index.add_item(i, vec)
-    feature_index.build(n_trees)
-    return feature_index
+    def generate_features(self):
+        """
+        Yield out the vector feature and path to that images
+        """
+        # self.id_labels = sorted(os.listdir(self.data_path))
+        for folder in tqdm(self.id_labels):
+            label_path = os.path.join(self.data_path, folder)
+            fn_paths = sorted(os.listdir(label_path))
+            fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
+            for fn_path in fn_paths:
+                feature = self.preprocess_img(fn_path)
+
+                yield feature, fn_path
 
 
-def search_index_by_key(key, feature_index, item_mapping, top_n=10):
-    distances = feature_index.get_nns_by_item(
-        key, top_n, include_distances=True
-    )
-    return [[a, item_mapping[a], distances[1][i]]
-            for i, a in enumerate(distances[0])]
+    def _map_path_item(self):
+        self.item_mapping = []
+        for folder in tqdm(self.id_labels):
+            label_path = os.path.join(self.data_path, folder)
+            fn_paths = sorted(os.listdir(label_path))
+            fn_paths = [os.path.join(label_path, fn_path) for fn_path in fn_paths]
+            for fn_path in fn_paths:
+                self.item_mapping.append(fn_path)
 
 
-def show_sim_imgs(search_key, feature_index, feature_mapping):
-
-    results = search_index_by_key(
-        search_key, feature_index, feature_mapping, 10
-    )
-
-    main_img = mpimg.imread(results[0][1])
-    plt.imshow(main_img)
-    fig = plt.figure(figsize=(8, 8))
-    columns = 3
-    rows = 3
-    for i in range(1, columns * rows + 1):
-        img = mpimg.imread(results[i][1])
-        fig.add_subplot(rows, columns, i)
-        plt.imshow(img)
-    plt.show()
+    def make_index_features(self, mode="image", n_trees=1000):
+        self.feature_index = AnnoyIndex(self.dims, metric='angular')
+        #self.item_mapping = []
+        for i, row in enumerate(self.generate_features()):
+            vec = row
+            self.feature_index.add_item(i, vec[0])
+            #self.item_mapping.append(vec[1])
+        self.feature_index.build(n_trees)
+        self._map_path_item()
 
 
-def show_imgs(id_folder):
-    fmt = 'path-to-train-folder/train/{}/images/{}_{}.JPEG'
-    random_imgs = [fmt.format(id_folder, id_folder, num)
-                   for num in random.sample(range(0, 500), 9)]
-    fig = plt.figure(figsize=(16, 16))
-    columns = 3
-    rows = 3
-    for i in range(1, columns * rows + 1):
-        img = mpimg.imread(random_imgs[i - 1])
-        fig.add_subplot(rows, columns, i)
-        plt.imshow(img)
-    plt.show()
+    def save_tree(self, path = '../models/index.ann'):
+        self.feature_index.save(path)
+
+
+    def load_tree(self, path = '../models/index.ann'):
+        self.feature_index = AnnoyIndex(self.dims)
+        self.feature_index.load(path)
+        self._map_path_item()
+
+
+    def search_index_by_vector(self, vector, top_n=10):
+        distances = self.feature_index.get_nns_by_vector(
+            vector, top_n, include_distances=True
+        )
+        return [{'index': a, 'path': self.item_mapping[a], 'distance': distances[1][i]}
+                for i, a in enumerate(distances[0])]
+
+
+if __name__ == '__main__':
+    base_model = VGG16(weights='imagenet')
+    model = Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
+    vs = VetorSearch(model)
+    #vs.make_index_features()
+    #vs.save_tree()
+    vs.load_tree()
+    print(vs.search_index_by_vector(vs.preprocess_img(fn_path='../pho.jpg'),
+            top_n=4))
