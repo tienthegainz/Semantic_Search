@@ -1,16 +1,30 @@
-import os
-import logging
+from keras.applications.vgg16 import preprocess_input
+from keras.models import Model
+from keras.applications.vgg16 import VGG16
+from keras.preprocessing import image
 
 from annoy import AnnoyIndex
 import numpy as np
 from numpy import linalg
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
-from keras.applications.vgg16 import preprocess_input
-from keras.models import Model
-from keras.applications.vgg16 import VGG16
-from keras.preprocessing import image
 from tqdm import tqdm
+
+import os
+import logging
+import time
+import argparse
+parser = argparse.ArgumentParser(description='Building Annoy tree to serach image')
+parser.add_argument('--img_path', '-imp', type=str,
+                    help='Image path to find similar vector')
+parser.add_argument('--tree_path', '-dtp', type=str, required = True,
+                    help='Tree ANN path')
+
+parser.add_argument('--build', '-B', action='store_true',
+                    help='Build the .ann file')
+parser.add_argument('--search', '-S', action='store_true',
+                    help='Search the image .ann file')
+args = parser.parse_args()
 
 class VetorSearch:
     def __init__(self, model, data_path='../Vietnam_Food/Training/',
@@ -69,11 +83,11 @@ class VetorSearch:
         self._map_path_item()
 
 
-    def save_tree(self, path = '../models/index.ann'):
+    def save_tree(self, path):
         self.feature_index.save(path)
 
 
-    def load_tree(self, path = '../models/index.ann'):
+    def load_tree(self, path):
         self.feature_index = AnnoyIndex(self.dims)
         self.feature_index.load(path)
         self._map_path_item()
@@ -88,11 +102,18 @@ class VetorSearch:
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     base_model = VGG16(weights='imagenet')
     model = Model(inputs=base_model.input, outputs=base_model.get_layer('fc1').output)
     vs = VetorSearch(model)
-    #vs.make_index_features()
-    #vs.save_tree()
-    vs.load_tree()
-    print(vs.search_index_by_vector(vs.preprocess_img(fn_path='../pho.jpg'),
-            top_n=4))
+    if args.build:
+        vs.make_index_features()
+        vs.save_tree(args.tree_path)
+    elif args.search:
+        vs.load_tree(args.tree_path)
+    print("Setup: %s seconds" % (time.time() - start_time))
+    if args.search:
+        start_time = time.time()
+        print(vs.search_index_by_vector(vs.preprocess_img(fn_path=args.img_path),
+                top_n=4))
+        print("Search: %s seconds" % (time.time() - start_time))
