@@ -3,7 +3,6 @@ import cv2
 
 from database import DBManagement
 from extract_feature import  ExtractFeature
-import config
 
 import os
 import logging
@@ -31,10 +30,6 @@ class ImageSearch:
         self._build_tree()
 
     def _build_tree(self):
-        # FIXME: Build annoy tree here.
-        """
-        n_trees: parameter should be as twice as much the items
-        """
         v_arr = self.db.get_features()
         for index, vector in enumerate(v_arr):
             self.feature_index.add_item(index, vector)
@@ -73,4 +68,3 @@ class ImageSearch:
             return None
 
 if __name__ == '__main__':
-    
