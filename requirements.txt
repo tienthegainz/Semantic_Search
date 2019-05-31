@@ -1,0 +1,6 @@
+numpy==1.14.3
+Keras==2.2.4
+annoy==1.15.2
+matplotlib==2.2.2
+h5py==2.7.1
+tqdm==4.32.1

@@ -1,4 +1,4 @@
-# Sematic searching
+# Not available
 
 Vector-searching system using Annoy and VGG16.
 
